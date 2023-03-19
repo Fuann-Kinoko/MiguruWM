@@ -8,6 +8,7 @@ A_IconTip := "「 Miguru Window Manager 」"
 
 #include *i lib\miguru\miguru.ahk
 #include *i lib\Popup.ahk
+#include *i lib\FocusIndicator.ahk
 
 GroupAdd("MIGURU_AUTOFLOAT", "Microsoft Teams-Benachrichtigung" " ahk_exe Teams.exe"                                                  )
 GroupAdd("MIGURU_AUTOFLOAT", "Microsoft Teams-Notification"     " ahk_exe Teams.exe"                                                  )
@@ -29,6 +30,25 @@ if !IsSet(MiguruWM) {
     ExitApp()
 }
 
+indicator := FocusIndicator()
+UpdateFocusIndicator(hwnd, type := "") {
+    static colors := Map(
+        "managed",   0xf79802,
+        "unmanaged", 0xff9e3d,
+    )
+
+    if !hwnd {
+        indicator.Hide()
+        return
+    }
+
+    c := colors.Get(type, 0xff0000)
+    if indicator.Color !== c {
+        indicator.Color := c
+    }
+    indicator.Show(hwnd)
+}
+
 mwm := MiguruWM({
     layout: "Tall",
     padding: {
@@ -40,6 +60,7 @@ mwm := MiguruWM({
     spacing: 0,
 
     showPopup: (text, opts) => Popup(text, opts),
+    updateFocusIndicator: UpdateFocusIndicator,
 })
 
 mod1 := "Alt"

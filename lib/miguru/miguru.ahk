@@ -20,6 +20,7 @@ WS_EX_CLIENTEDGE    := 0x00000200
 WS_EX_STATICEDGE    := 0x00020000
 WS_EX_APPWINDOW     := 0x00040000
 WS_EX_LAYERED       := 0x00080000
+WS_EX_NOACTIVATE    := 0x08000000
 
 WM_QUIT := 0x012
 
@@ -123,6 +124,7 @@ class MiguruWM extends WMEvents {
             mouseFollowsFocus: false,
 
             showPopup: (*) =>,
+            updateFocusIndicator: (*) =>,
 
             delays: {
                 retryManage: 100,
@@ -251,6 +253,12 @@ class MiguruWM extends WMEvents {
                 if event == EV_WINDOW_FOCUSED {
                     debug("Set active to non-managed {}", WinInfo(hwnd))
                     this._maybeActiveWindow := hwnd
+
+                    if !WinExist("ahk_id" hwnd " ahk_exe explorer.exe")
+                    || !WinExist("ahk_id" hwnd " ahk_class Shell_TrayWnd")
+                    && !WinExist("ahk_id" hwnd " ahk_class Shell_SecondaryTrayWnd") {
+                        this._opts.updateFocusIndicator.Call(hwnd, "unmanaged")
+                    }
                 }
                 return
             }
@@ -300,6 +308,7 @@ class MiguruWM extends WMEvents {
 
                 ws.ActiveWindow := hwnd
                 this._maybeActiveWindow := ""
+                this._opts.updateFocusIndicator.Call(hwnd, "managed")
 
                 ;; If it's an explorer window, focus the content panel.
                 if WinExist("ahk_id" hwnd
@@ -318,7 +327,11 @@ class MiguruWM extends WMEvents {
                     monitor.Index, ws.Index, WinInfo(hwnd)])
 
                 ws.Retile()
+                this._opts.updateFocusIndicator.Call(hwnd, "managed")
             }
+
+        case EV_WINDOW_POSITIONING:
+            this._opts.updateFocusIndicator.Call("")
 
         case EV_WINDOW_HIDDEN, EV_WINDOW_CLOAKED, EV_WINDOW_MINIMIZED:
             this._hide(event, hwnd)
@@ -348,6 +361,16 @@ class MiguruWM extends WMEvents {
             this._opts.showPopup.Call(this.VD.DesktopName(args.now), {
                 activeMonitor: this.activeMonitor.Index,
             })
+
+            oldWs := this._workspaces[this.activeMonitor, args.was]
+            newWs := this._workspaces[this.activeMonitor, args.now]
+
+            oldWs.ActiveWindow := ""
+            if newWs.WindowCount < 1 {
+                this._opts.updateFocusIndicator.Call("")
+            } else {
+                this._opts.updateFocusIndicator.Call(newWs.ActiveWindow, "managed")
+            }
 
             ;; Add pinned windows to the newly active workspace or retile.
             if this._pinned.Count > 0 {
